@@ -2,6 +2,7 @@
 #include "esphome/core/log.h"
 #include "spa_thermostat.h"
 #include "esphome/components/climate/climate_mode.h"
+#include <cmath> // For std::abs
 
 namespace esphome
 {
@@ -73,17 +74,58 @@ namespace esphome
             {
                 this->target_temperature = NAN;
                 this->current_temperature = NAN;
+                this->pending_current_temp = NAN;
                 return;
             }
 
+            // Target Temperature
             float target_temp = spaState->target_temp;
             needs_update = is_diff_no_nan(target_temp, this->target_temperature) || needs_update;
             this->target_temperature = !std::isnan(target_temp) ? target_temp : this->target_temperature;
 
-            auto current_temp = spaState->current_temp;
-            needs_update = is_diff_no_nan(current_temp, this->current_temperature) || needs_update;
-            this->current_temperature = !std::isnan(current_temp) ? current_temp : this->current_temperature;
+            // Current Temperature with Relative Filtering
+            float raw_current_temp = spaState->current_temp;
+            if (!std::isnan(raw_current_temp))
+            {
+                if (std::isnan(this->current_temperature))
+                {
+                    // First valid reading after boot/reconnect, accept immediately
+                    needs_update = is_diff_no_nan(raw_current_temp, this->current_temperature) || needs_update;
+                    this->current_temperature = raw_current_temp;
+                }
+                else
+                {
+                    float delta = std::abs(raw_current_temp - this->current_temperature);
+                    if (delta > 5.0f) // Threshold: 5 degrees max normal change
+                    {
+                        // Check if this is a new anomaly or an ongoing one
+                        if (std::isnan(this->pending_current_temp) || std::abs(raw_current_temp - this->pending_current_temp) > 0.5f)
+                        {
+                            // Start tracking the new anomalous value
+                            this->pending_current_temp = raw_current_temp;
+                            this->pending_temp_start = millis();
+                            ESP_LOGD("spa_thermostat", "Anomalous temp jump detected (%.1f). Waiting to stabilize.", raw_current_temp);
+                        }
+                        else if (millis() - this->pending_temp_start > 60000) // Settle time: 60 seconds
+                        {
+                            // Temp has held at this anomalous level long enough, assume water change
+                            ESP_LOGD("spa_thermostat", "Anomalous temp (%.1f) stabilized. Accepting as new baseline.", raw_current_temp);
+                            needs_update = is_diff_no_nan(raw_current_temp, this->current_temperature) || needs_update;
+                            this->current_temperature = raw_current_temp;
+                            this->pending_current_temp = NAN; // Reset tracker
+                        }
+                    }
+                    else
+                    {
+                        // Normal incremental change
+                        needs_update = is_diff_no_nan(raw_current_temp, this->current_temperature) || needs_update;
+                        this->current_temperature = raw_current_temp;
+                        this->pending_current_temp = NAN; // Reset tracker as things are normal
+                    }
+                }
+            }
 
+            // Actions and Modes
             auto new_action = spaState->heat_state == 1 ? climate::CLIMATE_ACTION_HEATING : climate::CLIMATE_ACTION_IDLE;
             needs_update = new_action != this->action || needs_update;
             this->action = new_action;
@@ -97,6 +139,7 @@ namespace esphome
             needs_update = preset_mode != this->preset || needs_update;
             this->preset = preset_mode;
 
+            // Heartbeat update every 5 minutes
             needs_update = this->last_update_time + 300000 < millis() || needs_update;
 
             if (needs_update)
