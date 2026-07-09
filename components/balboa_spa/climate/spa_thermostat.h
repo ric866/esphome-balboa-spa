@@ -26,6 +26,8 @@ namespace esphome
       climate::ClimateTraits traits() override;
       float pending_current_temp{NAN};
       uint32_t pending_temp_start{0};
+      float pending_target_temp = NAN;
+      uint32_t pending_target_temp_start = 0;
     private:
       BalboaSpa *spa;
       uint32_t last_update_time;
