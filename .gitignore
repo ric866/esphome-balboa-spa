@@ -31,9 +31,30 @@
 *.out
 *.app
 
-# Python cache
-__pycache__
-/.esphome
+# Python cache & virtual environment
+__pycache__/
+.venv/
+
+# ESPHome & PlatformIO
+/.esphome/
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+secrets.yaml
+
+# Compiled firmware files
+*.bin
+*.elf
+*.map
+*.hex
+
+# Antigravity persistence
+.gemini/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
 
 # CodeQL temporary files
 _codeql_detected_source_root

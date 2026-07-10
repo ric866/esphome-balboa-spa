@@ -291,17 +291,33 @@ namespace esphome
                 return;
             }
 
-            // Drop until SOF is seen
-            if (input_queue.first() != 0x7E && received_byte != 0x7E)
+            uint32_t now = millis();
+            if (input_queue.size() > 0 && now - last_received_time > 250)
             {
+                ESP_LOGW(TAG, "Timeout waiting for rest of packet (size %d), clearing queue", input_queue.size());
                 input_queue.clear();
-                return;
             }
 
-            // Double SOF-marker, drop last one
-            if (input_queue.size() >= 2 && input_queue[1] == 0x7E)
+            // Drop until SOF is seen
+            if (input_queue.size() == 0)
             {
-                input_queue.pop();
+                if (received_byte != 0x7E)
+                {
+                    return;
+                }
+            }
+            else if (input_queue.first() != 0x7E)
+            {
+                input_queue.clear();
+                if (received_byte != 0x7E)
+                {
+                    return;
+                }
+            }
+
+            // Double SOF-marker, drop the second SOF byte immediately
+            if (input_queue.size() == 1 && input_queue.first() == 0x7E && received_byte == 0x7E)
+            {
                 return;
             }
 
@@ -631,6 +647,12 @@ namespace esphome
 
         void BalboaSpa::decodeState()
         {
+            if (spa_temp_scale == TEMP_SCALE::UNDEFINED)
+            {
+                ESP_LOGD(TAG, "Postponing state decode because spa temperature scale is undefined");
+                return;
+            }
+
             // 25:Flag Byte 20 - Set Temperature
             float temp_read = 0.0f;
 
@@ -675,9 +697,9 @@ namespace esphome
                     temp_read = convert_f_to_c(input_queue[7]);
                 }
 
-                if (temp_read > 80)
+                if (temp_read < 1.0f || temp_read > 80.0f)
                 {
-                    // Temp is getting close to boiling. Definitely invalid.
+                    // Temp is out of range. Definitely invalid.
                     ESP_LOGW(TAG, "Spa/temperature/current INVALID %.2f %.2f %d",
                              input_queue[7], temp_read, spaConfig.temperature_scale);
                 }
