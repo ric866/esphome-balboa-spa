@@ -292,7 +292,8 @@ namespace esphome
             }
 
             uint32_t now = millis();
-            if (input_queue.size() > 0 && now - last_received_time > 250)
+            uint32_t now_us = micros();
+            if (input_queue.size() > 0 && now_us - last_received_time_us > 15000)
             {
                 ESP_LOGW(TAG, "Timeout waiting for rest of packet (size %d), clearing queue", input_queue.size());
                 input_queue.clear();
@@ -322,6 +323,20 @@ namespace esphome
             }
 
             input_queue.push(received_byte);
+
+            // Validate length byte (index 1) once we have it
+            if (input_queue.size() == 2)
+            {
+                if (input_queue[1] < 5 || input_queue[1] > 35)
+                {
+                    input_queue.clear();
+                    if (received_byte == 0x7E)
+                    {
+                        input_queue.push(0x7E);
+                    }
+                    return;
+                }
+            }
 
             // Complete package
             // if (received_byte == 0x7E && input_queue[0] == 0x7E && input_queue[1] != 0x7E) {
@@ -515,6 +530,7 @@ namespace esphome
                 input_queue.clear();
             }
             last_received_time = millis();
+            last_received_time_us = micros();
         }
 
         uint8_t BalboaSpa::crc8(CircularBuffer<uint8_t, 100> &data, bool ignore_delimiter)
