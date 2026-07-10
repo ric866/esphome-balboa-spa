@@ -75,50 +75,19 @@ namespace esphome
                 this->target_temperature = NAN;
                 this->current_temperature = NAN;
                 this->pending_current_temp = NAN;
-                this->pending_target_temp = NAN;
                 return;
             }
 
-            // Target Temperature with Relative Filtering
+            // Target Temperature with Absolute Range Filtering (Min 10°C, Max 40°C)
             float raw_target_temp = spaState->target_temp;
-            if (!std::isnan(raw_target_temp))
+            if (!std::isnan(raw_target_temp) && raw_target_temp >= 10.0f && raw_target_temp <= 40.0f)
             {
-                if (std::isnan(this->target_temperature))
-                {
-                    // First valid reading after boot/reconnect, accept immediately
-                    needs_update = is_diff_no_nan(raw_target_temp, this->target_temperature) || needs_update;
-                    this->target_temperature = raw_target_temp;
-                }
-                else
-                {
-                    float delta = std::abs(raw_target_temp - this->target_temperature);
-                    if (delta > 5.0f) // Threshold: 5 degrees max normal change
-                    {
-                        // Check if this is a new anomaly or an ongoing one
-                        if (std::isnan(this->pending_target_temp) || std::abs(raw_target_temp - this->pending_target_temp) > 0.5f)
-                        {
-                            // Start tracking the new anomalous value
-                            this->pending_target_temp = raw_target_temp;
-                            this->pending_target_temp_start = millis();
-                            ESP_LOGD("spa_thermostat", "Anomalous target temp jump detected (%.1f). Waiting to stabilize.", raw_target_temp);
-                        }
-                        else if (millis() - this->pending_target_temp_start > 60000) // Settle time: 60 seconds
-                        {
-                            // Temp has held at this anomalous level long enough, accept it
-                            ESP_LOGD("spa_thermostat", "Anomalous target temp (%.1f) stabilized. Accepting as new baseline.", raw_target_temp);
-                            needs_update = is_diff_no_nan(raw_target_temp, this->target_temperature) || needs_update;
-                            this->target_temperature = raw_target_temp;
-                            this->pending_target_temp = NAN; // Reset tracker
-                        }
-                    }
-                    else
-                    {
-                        // Normal incremental change
-                        needs_update = is_diff_no_nan(raw_target_temp, this->target_temperature) || needs_update;
-                        this->target_temperature = raw_target_temp;
-                        this->pending_target_temp = NAN; // Reset tracker as things are normal
-                    }
-                }
+                needs_update = is_diff_no_nan(raw_target_temp, this->target_temperature) || needs_update;
+                this->target_temperature = raw_target_temp;
+            }
+            else if (!std::isnan(raw_target_temp) && (raw_target_temp < 10.0f || raw_target_temp > 40.0f))
+            {
+                ESP_LOGD("spa_thermostat", "Ignored out-of-bounds target temp: %.1f", raw_target_temp);
             }
 
             // Current Temperature with Relative Filtering
