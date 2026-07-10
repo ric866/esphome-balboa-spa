@@ -322,6 +322,17 @@ namespace esphome
                 return;
             }
 
+            // If we receive a 0x7E when the queue ends in a 0x7E from a partial/corrupted packet,
+            // we treat this as a packet boundary. Discard the corrupted queue and start the new packet.
+            if (received_byte == 0x7E && input_queue.size() > 1 && input_queue.last() == 0x7E)
+            {
+                input_queue.clear();
+                input_queue.push(0x7E);
+                last_received_time = millis();
+                last_received_time_us = micros();
+                return;
+            }
+
             input_queue.push(received_byte);
 
             // Validate length byte (index 1) once we have it
