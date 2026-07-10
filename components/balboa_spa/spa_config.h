@@ -11,6 +11,23 @@ namespace esphome
         struct SpaConfig
         {
         public:
+            SpaConfig() {
+                pump1 = 0;
+                pump2 = 0;
+                pump3 = 0;
+                pump4 = 0;
+                pump5 = 0;
+                pump6 = 0;
+                light1 = 0;
+                light2 = 0;
+                circ = 0;
+                blower = 0;
+                mister = 0;
+                aux1 = 0;
+                aux2 = 0;
+                temperature_scale = 0;
+                clock_mode = 0;
+            }
             uint8_t pump1 : 2; // this could be 1=1 speed; 2=2 speeds
             uint8_t pump2 : 2;
             uint8_t pump3 : 2;
