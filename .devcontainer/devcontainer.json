@@ -1,0 +1,40 @@
+{
+  "name": "ESPHome Balboa Spa Dev Env",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.languageServer": "Pylance",
+        "esphome.esphome-path": "/usr/local/bin/esphome",
+        "files.exclude": {
+          "**/.gemini": true
+        },
+        "search.exclude": {
+          "**/.gemini": true
+        },
+        "files.watcherExclude": {
+          "**/.gemini/**": true
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-vscode.cpptools",
+        "redhat.vscode-yaml",
+        "ESPHome.esphome-vscode"
+      ]
+    }
+  },
+  "remoteUser": "vscode",
+  "features": {},
+  "runArgs": [
+    "--privileged"
+  ],
+  "mounts": [
+    "source=${localWorkspaceFolder}/.gemini,target=/root/.gemini,type=bind",
+    "source=${localWorkspaceFolder}/.gemini,target=/home/vscode/.gemini,type=bind"
+  ]
+}
